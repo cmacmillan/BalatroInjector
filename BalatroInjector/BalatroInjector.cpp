@@ -8,18 +8,39 @@ int main(int argc, const char * argv[])
 {
 	if (argc < 3) 
 	{
-		printf("Usage: Injector <pid> <dllpath>\n");
+		printf("Usage: Injector <exepath> <dllpath>\n");
 		return 0;
 	}
 
+	const char * pChzBalatroPath = argv[1];
 	const char * pChzDllPath = argv[2];
 
-	int pid = atoi(argv[1]);
+	STARTUPINFOA si;
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	LPSTARTUPINFOA lpsi = &si;
 
-	HANDLE hProcess = OpenProcess(
-						PROCESS_VM_WRITE | PROCESS_VM_OPERATION | PROCESS_CREATE_THREAD,
-						FALSE,
-						pid);
+	PROCESS_INFORMATION pi;
+	ZeroMemory(&pi, sizeof(pi));
+
+	if (!CreateProcessA(
+			pChzBalatroPath,
+			nullptr,
+			nullptr,
+			nullptr,
+			FALSE,
+			0,
+			nullptr,	
+			nullptr,
+			lpsi,
+			&pi)
+		) 
+	{
+		printf("Error starting process!");
+		return 1;
+	}
+
+	HANDLE hProcess = pi.hProcess;
 
 	if (!hProcess)
 	{

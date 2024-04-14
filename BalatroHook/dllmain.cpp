@@ -1,7 +1,7 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 #include "pch.h"
 
-//#include <detours.h>
+#include <detours.h>
 //#include <cstdio>
 
 typedef void * lua_State;
@@ -42,6 +42,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	DWORD  dwReason,
 	LPVOID lpReserved)
 {
+	/*
 	switch (dwReason) {
 	case DLL_PROCESS_ATTACH:
 		WCHAR aWcharText[256];
@@ -51,14 +52,14 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	default:
 		break;
 	}
+	*/
 
-	/*
 	if (DetourIsHelperProcess())
 	{
 		return TRUE;
 	}
 
-	luaL_loadfilex = (_luaL_loadfilex) LOADFILEEX_ADDR;hThread
+	luaL_loadfilex = (_luaL_loadfilex) LOADFILEEX_ADDR;
 	lua_pcall = (_lua_pcall) PCALL_ADDR;
 	luaopen_jit_original = (_luaopen_jit) OPENJIT_ADDR;
 
@@ -78,7 +79,6 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		DetourDetach(&luaopen_jit_original, luaopen_jit_hook);
 		DetourTransactionCommit();
 	}
-	*/
 
 	return TRUE;
 }
