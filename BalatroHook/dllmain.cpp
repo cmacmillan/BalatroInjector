@@ -6,9 +6,9 @@
 
 typedef void * lua_State;
 
-const void * LOADFILEEX_ADDR = 0x0;
-const void * PCALL_ADDR = 0x0; //7FFA8F501B30 - lua51.lua_pcall
-const void * OPENJIT_ADDR = (void *) 0x7FFAAAAC2390;
+//const void * LOADFILEEX_ADDR = 0x0;
+//const void * PCALL_ADDR = 0x0; //7FFA8F501B30 - lua51.lua_pcall
+//const void * OPENJIT_ADDR = (void *) 0x7FFAAAAC2390;
 
 
 typedef int (*_luaL_loadfilex)(lua_State * L, const char * filename, const char * mode);
@@ -43,17 +43,76 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	LPVOID lpReserved)
 {
 	/*
+FARPROC GetProcAddress(
+  [in] HMODULE hModule,
+  [in] LPCSTR  lpProcName
+);
+*/
 	switch (dwReason) {
 	case DLL_PROCESS_ATTACH:
-		WCHAR aWcharText[256];
-		wsprintfW(aWcharText, L"Hello from process %u!", GetCurrentProcessId());
-		MessageBox(nullptr, aWcharText, L"Blah blah blah", MB_ICONINFORMATION);
+		{
+			HMODULE hModule = GetModuleHandle(L"Lua51.dll");
+			if (!hModule) 
+			{
+				MessageBox(nullptr, L"Error: Didn't find module", L"Result", MB_ICONINFORMATION);
+				return FALSE;
+			}
+
+			FARPROC farprocLuaopenjit = GetProcAddress(hModule, "luaopen_jit");
+			if (!farprocLuaopenjit) 
+			{
+				MessageBox(nullptr, L"Error: Failed to find luaopen_jit!", L"Result", MB_ICONINFORMATION);
+				return FALSE;
+			}
+			
+			FARPROC farprocLualloadfilex = GetProcAddress(hModule, "luaL_loadfilex");
+			if (!farprocLualloadfilex) 
+			{
+				MessageBox(nullptr, L"Error: Failed to find luaopen_jit!", L"Result", MB_ICONINFORMATION);
+				return FALSE;
+			}
+
+			FARPROC farprocLuapcall = GetProcAddress(hModule, "lua_pcall");
+			if (!farprocLuapcall) 
+			{
+				MessageBox(nullptr, L"Error: Failed to find luaopen_jit!", L"Result", MB_ICONINFORMATION);
+				return FALSE;
+			}
+
+			if (DetourIsHelperProcess())
+			{
+				return TRUE;
+			}
+
+			/*
+			luaL_loadfilex = (_luaL_loadfilex) ;
+			lua_pcall = (_lua_pcall) PCALL_ADDR;
+			luaopen_jit_original = (_luaopen_jit) OPENJIT_ADDR;
+
+			if (dwReason == DLL_PROCESS_ATTACH)
+			{
+				DetourRestoreAfterWith();
+
+				DetourTransactionBegin();
+				DetourUpdateThread(GetCurrentThread());
+				DetourAttach(&luaopen_jit_original, luaopen_jit_hook);
+				DetourTransactionCommit();
+			}
+			else if (dwReason == DLL_PROCESS_DETACH)
+			{
+				DetourTransactionBegin();
+				DetourUpdateThread(GetCurrentThread());
+				DetourDetach(&luaopen_jit_original, luaopen_jit_hook);
+				DetourTransactionCommit();
+			}
+			*/
+		}
 		break;
 	default:
 		break;
 	}
-	*/
 
+	/*
 	if (DetourIsHelperProcess())
 	{
 		return TRUE;
@@ -79,6 +138,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		DetourDetach(&luaopen_jit_original, luaopen_jit_hook);
 		DetourTransactionCommit();
 	}
+	*/
 
 	return TRUE;
 }
