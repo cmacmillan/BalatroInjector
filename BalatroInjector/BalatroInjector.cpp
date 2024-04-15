@@ -81,8 +81,13 @@ int main(int argc, const char * argv[])
 		return 1;
 	}
 
-	Sleep(1000);
+	DWORD waitResult = WaitForSingleObject(hThread, 5000);
 
+	if (waitResult != WAIT_OBJECT_0) 
+	{
+		printf("Error waiting for single object!\n");
+	}
+	
 	ResumeThread(pi.hThread);
 
 	CloseHandle(hThread);

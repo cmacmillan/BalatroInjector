@@ -4,9 +4,9 @@ FILE_PATH = "C:\\LuaJitHookLogs\\"
 STARTING_TIME = os.clock()
 --gimmecache = {}
 GDUMPED = false
-blah = true
+---blah = true
 --gimmecache["a"] = "b"
-_G.oof = {}
+---_G.oof = {}
 
 function pad(str, i)
     local result = str
@@ -17,9 +17,9 @@ function pad(str, i)
 end
 
 function gimme(table, depth)
-    if (gimmecache[table] ~= nil) then
-        return "\n"
-    end
+    --if (gimmecache[table] ~= nil) then
+        --return "\n"
+    --end
 
     --gimmecache.insert(table, true)
 

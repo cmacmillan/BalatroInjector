@@ -17,8 +17,8 @@ _lua_pcall lua_pcall;
 int luaopen_jit_hook(lua_State * L)
 {
 	int ret_val = luaopen_jit_original(L);
-	//luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\test.lua", NULL) || lua_pcall(L, 0, -1, 0);
-	luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\empty.lua", NULL) || lua_pcall(L, 0, -1, 0);
+	luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\test.lua", NULL) || lua_pcall(L, 0, -1, 0);
+	//luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\empty.lua", NULL) || lua_pcall(L, 0, -1, 0);
 	return ret_val;
 }
 
