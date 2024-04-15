@@ -2,12 +2,51 @@ jit.off()
 
 FILE_PATH = "C:\\LuaJitHookLogs\\"
 STARTING_TIME = os.clock()
+--gimmecache = {}
 GDUMPED = false
+blah = true
+--gimmecache["a"] = "b"
+_G.oof = {}
+
+function pad(str, i)
+    local result = str
+    for c=0, i, 1 do
+        result = "  "..result
+    end
+    return result
+end
+
+function gimme(table, depth)
+    if (gimmecache[table] ~= nil) then
+        return "\n"
+    end
+
+    --gimmecache.insert(table, true)
+
+    --if (table == _G and depth ~= 0) then
+        --return pad("..._G...\n", depth+1)
+    --end
+    --if (depth > 999) then
+    if (depth > 1) then
+        return pad("...truncated...\n",depth+1)
+    end
+    local result = ""
+    for k, v in pairs(table) do
+        if (v ~= gimmecache) then
+			result = result..pad(" "..k.." ("..type(v)..")".."\n", depth)
+			if type(v) == "table" then
+				result = result..gimme(v, depth+1)
+			end
+        end
+    end
+    return result
+end
 
 function dumpGlobals()
     local fname = FILE_PATH .. "globals_" .. STARTING_TIME .. ".txt"
+
     local globalsFile = io.open(fname, "w")
-    globalsFile:write(table.show(_G, "_G"))
+    globalsFile:write(gimme(_G, 0))
     globalsFile:flush()
     globalsFile:close()
 end

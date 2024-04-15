@@ -29,7 +29,7 @@ int main(int argc, const char * argv[])
 			nullptr,
 			nullptr,
 			FALSE,
-			0,
+			CREATE_SUSPENDED,
 			nullptr,	
 			nullptr,
 			lpsi,
@@ -81,8 +81,14 @@ int main(int argc, const char * argv[])
 		return 1;
 	}
 
+	Sleep(1000);
+
+	ResumeThread(pi.hThread);
+
 	CloseHandle(hThread);
 	CloseHandle(hProcess);
+
+	printf("Done.\n");
 
 	return 0;
 }
