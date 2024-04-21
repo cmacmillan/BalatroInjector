@@ -8,6 +8,10 @@ GDUMPED = false
 --gimmecache["a"] = "b"
 ---_G.oof = {}
 
+--- Remember debug hook is commented out at the bottom
+
+---blah blah bad!
+
 function pad(str, i)
     local result = str
     for c=0, i, 1 do
@@ -79,4 +83,5 @@ function trace(event, line)
     traceFile:flush()
     traceFile:close()
 end
-debug.sethook(trace, "c")
+
+---debug.sethook(trace, "c")

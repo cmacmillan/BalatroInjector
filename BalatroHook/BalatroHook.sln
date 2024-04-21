@@ -6,6 +6,9 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BalatroHook", "BalatroHook.vcxproj", "{30EC4423-0D10-4319-A807-03E213DF45B5}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BalatroInjector", "..\BalatroInjector\BalatroInjector.vcxproj", "{FEB83923-8A36-4A60-A816-AB91A4E5E623}"
+	ProjectSection(ProjectDependencies) = postProject
+		{30EC4423-0D10-4319-A807-03E213DF45B5} = {30EC4423-0D10-4319-A807-03E213DF45B5}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

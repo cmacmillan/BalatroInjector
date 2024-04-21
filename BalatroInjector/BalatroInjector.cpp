@@ -7,6 +7,7 @@
 #include <strsafe.h>
 
 LPCTSTR lpctstrSlot = TEXT("\\\\.\\mailslot\\BalatroInjector");
+HANDLE m_hProcess;
 
 int main(int argc, const char * argv[])
 {
@@ -15,6 +16,8 @@ int main(int argc, const char * argv[])
 		printf("Usage: Injector <exepath> <dllpath>\n");
 		return 0;
 	}
+
+	//TerminateProcess(m_hProcess, 1);
 
 	HANDLE hMailslot = CreateMailslot(lpctstrSlot, 0, MAILSLOT_WAIT_FOREVER, nullptr);
 
@@ -51,16 +54,16 @@ int main(int argc, const char * argv[])
 		return 1;
 	}
 
-	HANDLE hProcess = pi.hProcess;
+	HANDLE m_hProcess = pi.hProcess;
 
-	if (!hProcess)
+	if (!m_hProcess)
 	{
 		printf("Error opening process (%u)\n", GetLastError());
 		return 1;
 	}
 
 	LPVOID p = VirtualAllocEx(
-				hProcess, 
+				m_hProcess, 
 				nullptr, 
 				1 << 12, 
 				MEM_COMMIT | MEM_RESERVE, 
@@ -72,14 +75,14 @@ int main(int argc, const char * argv[])
 	}
 
 	WriteProcessMemory(
-		hProcess, 
+		m_hProcess, 
 		p, 
 		pChzDllPath, 
 		strlen(pChzDllPath) + 1, 
 		nullptr);
 
 	HANDLE hThread = CreateRemoteThread(
-						hProcess, 
+						m_hProcess, 
 						nullptr, 
 						0, 
 						(LPTHREAD_START_ROUTINE) GetProcAddress(GetModuleHandle(L"kernel32.dll"), "LoadLibraryA"),
@@ -109,7 +112,7 @@ int main(int argc, const char * argv[])
 
 		DWORD cbMessage, cMessage, cbRead; 
 		BOOL fResult; 
-		LPTSTR lpszBuffer; 
+		LPSTR lpszBuffer; 
 		TCHAR achID[80]; 
 		DWORD cAllMessages; 
 		HANDLE hEvent;
@@ -147,8 +150,8 @@ int main(int argc, const char * argv[])
 		{ 
 			// Allocate memory for the message. 
 	 
-			lpszBuffer = (LPTSTR) GlobalAlloc(GPTR, 
-				lstrlen((LPTSTR) achID)*sizeof(TCHAR) + cbMessage); 
+			lpszBuffer = (LPSTR) GlobalAlloc(GPTR, 
+				strlen((LPSTR) achID)*sizeof(CHAR) + cbMessage); 
 			if( NULL == lpszBuffer )
 				return FALSE;
 			lpszBuffer[0] = '\0'; 
@@ -168,7 +171,7 @@ int main(int argc, const char * argv[])
 		 
 			// Display the message. 
 	 
-			_tprintf(lpszBuffer); 
+			printf(lpszBuffer); 
 	 
 			GlobalFree((HGLOBAL) lpszBuffer); 
 	 
@@ -185,11 +188,10 @@ int main(int argc, const char * argv[])
 			} 
 		} 
 		CloseHandle(hEvent);
-		return TRUE; 
 	}
 
 	CloseHandle(hThread);
-	CloseHandle(hProcess);
+	CloseHandle(m_hProcess);
 
 	printf("Done.\n");
 
