@@ -3,6 +3,10 @@
 
 #include <Windows.h>
 #include <stdio.h>
+#include <tchar.h>
+#include <strsafe.h>
+
+LPCTSTR lpctstrSlot = TEXT("\\\\.\\mailslot\\BalatroInjector");
 
 int main(int argc, const char * argv[])
 {
@@ -12,6 +16,13 @@ int main(int argc, const char * argv[])
 		return 0;
 	}
 
+	HANDLE hMailslot = CreateMailslot(lpctstrSlot, 0, MAILSLOT_WAIT_FOREVER, nullptr);
+
+    if (hMailslot == INVALID_HANDLE_VALUE) 
+    { 
+        printf("CreateMailslot failed with %d\n", GetLastError());
+		return 1;
+    } 
 	const char * pChzBalatroPath = argv[1];
 	const char * pChzDllPath = argv[2];
 
@@ -89,6 +100,93 @@ int main(int argc, const char * argv[])
 	}
 	
 	ResumeThread(pi.hThread);
+
+	while (true) 
+	{
+		// Sleep
+ 
+		Sleep(100);
+
+		DWORD cbMessage, cMessage, cbRead; 
+		BOOL fResult; 
+		LPTSTR lpszBuffer; 
+		TCHAR achID[80]; 
+		DWORD cAllMessages; 
+		HANDLE hEvent;
+		OVERLAPPED ov;
+	 
+		cbMessage = cMessage = cbRead = 0; 
+
+		hEvent = CreateEvent(NULL, FALSE, FALSE, TEXT("ExampleSlot"));
+		if (NULL == hEvent)
+			continue;
+		ov.Offset = 0;
+		ov.OffsetHigh = 0;
+		ov.hEvent = hEvent;
+	 
+		fResult = GetMailslotInfo( hMailslot, // mailslot handle 
+			(LPDWORD) NULL,               // no maximum message size 
+			&cbMessage,                   // size of next message 
+			&cMessage,                    // number of messages 
+			(LPDWORD) NULL);              // no read time-out 
+	 
+		if (!fResult) 
+		{ 
+			printf("GetMailslotInfo failed with %d.\n", GetLastError()); 
+			return 1; 
+		} 
+	 
+		if (cbMessage == MAILSLOT_NO_MESSAGE) 
+		{ 
+			continue;
+		} 
+	 
+		cAllMessages = cMessage; 
+	 
+		while (cMessage != 0)  // retrieve all messages
+		{ 
+			// Allocate memory for the message. 
+	 
+			lpszBuffer = (LPTSTR) GlobalAlloc(GPTR, 
+				lstrlen((LPTSTR) achID)*sizeof(TCHAR) + cbMessage); 
+			if( NULL == lpszBuffer )
+				return FALSE;
+			lpszBuffer[0] = '\0'; 
+	 
+			fResult = ReadFile(hMailslot, 
+				lpszBuffer, 
+				cbMessage, 
+				&cbRead, 
+				&ov); 
+	 
+			if (!fResult) 
+			{ 
+				printf("ReadFile failed with %d.\n", GetLastError()); 
+				GlobalFree((HGLOBAL) lpszBuffer); 
+				return FALSE; 
+			} 
+		 
+			// Display the message. 
+	 
+			_tprintf(lpszBuffer); 
+	 
+			GlobalFree((HGLOBAL) lpszBuffer); 
+	 
+			fResult = GetMailslotInfo(hMailslot,  // mailslot handle 
+				(LPDWORD) NULL,               // no maximum message size 
+				&cbMessage,                   // size of next message 
+				&cMessage,                    // number of messages 
+				(LPDWORD) NULL);              // no read time-out 
+	 
+			if (!fResult) 
+			{ 
+				printf("GetMailslotInfo failed (%d)\n", GetLastError());
+				return FALSE; 
+			} 
+		} 
+		CloseHandle(hEvent);
+		return TRUE; 
+	}
 
 	CloseHandle(hThread);
 	CloseHandle(hProcess);

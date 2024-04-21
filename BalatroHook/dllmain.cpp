@@ -3,6 +3,8 @@
 
 #include <detours.h>
 
+LPCTSTR lpctstrSlot = TEXT("\\\\.\\mailslot\\BalatroInjector");
+
 typedef void * lua_State;
 
 typedef int (*_luaL_loadfilex)(lua_State * L, const char * filename, const char * mode);
@@ -21,6 +23,32 @@ int luaopen_jit_hook(lua_State * L)
 	//luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\empty.lua", NULL) || lua_pcall(L, 0, -1, 0);
 	return ret_val;
 }
+
+BOOL WriteSlot(HANDLE hSlot, LPCTSTR lpszMessage)
+{
+	BOOL fResult;
+	DWORD cbWritten;
+
+	fResult = WriteFile(hSlot,
+		lpszMessage,
+		(DWORD) (lstrlen(lpszMessage) + 1) * sizeof(TCHAR),
+		&cbWritten,
+		(LPOVERLAPPED) NULL);
+
+	if (!fResult)
+	{
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+HANDLE m_hFile;
+
+int main()
+{
+}
+
 
 BOOL APIENTRY DllMain(HMODULE hModule,
 	DWORD  dwReason,
@@ -54,7 +82,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		FARPROC farprocLuapcall = GetProcAddress(hModule, "lua_pcall");
 		if (!farprocLuapcall)
 		{
-			MessageBox(nullptr, L"Error: Failed to find luaopen_jit!", L"Result", MB_ICONINFORMATION);
+			MessageBox(nullptr, L"Error: Failed tom_hFile find luaopen_jit!", L"Result", MB_ICONINFORMATION);
 			return FALSE;
 		}
 
@@ -68,6 +96,21 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		luaL_loadfilex = (_luaL_loadfilex) farprocLualloadfilex;
 		lua_pcall = (_lua_pcall) farprocLuapcall;
 
+		m_hFile = CreateFile(lpctstrSlot,
+			GENERIC_WRITE,
+			FILE_SHARE_READ,
+			(LPSECURITY_ATTRIBUTES) NULL,
+			OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL,
+			(HANDLE) NULL);
+
+		if (m_hFile == INVALID_HANDLE_VALUE)
+		{
+			return FALSE;
+		}
+
+		WriteSlot(m_hFile, TEXT("Message one for mailslot."));
+
 		DetourRestoreAfterWith();
 
 		DetourTransactionBegin();
@@ -77,13 +120,14 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	}
 	break;
 	case DLL_PROCESS_DETACH:
-		{
-			DetourTransactionBegin();
-			DetourUpdateThread(GetCurrentThread());
-			DetourDetach(&luaopen_jit_original, luaopen_jit_hook);
-			DetourTransactionCommit();
-		}
-		break;
+	{
+		CloseHandle(m_hFile);
+		DetourTransactionBegin();
+		DetourUpdateThread(GetCurrentThread());
+		DetourDetach(&luaopen_jit_original, luaopen_jit_hook);
+		DetourTransactionCommit();
+	}
+	break;
 	default:
 		break;
 	}
