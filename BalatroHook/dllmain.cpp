@@ -93,7 +93,9 @@ int luaL_loadstring(lua_State * L, const char * str)
 
 int luaL_error(lua_State * L, const char * fmt, ...) 
 {
-	Write("Error!\n");
+	WriteFmt(fmt, va_list());
+	WriteFmt("Error!\n");
+
 	int ret_val = luaL_error_original(L, fmt, va_list());
 	return ret_val;
 }
@@ -113,8 +115,7 @@ int luaopen_jit_hook(lua_State * L)
 	lua_pushcclosure(L, lua_my_print, 0);
 	lua_setfield(L, LUA_GLOBALSINDEX, "my_print");
 
-	//luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\test.lua", NULL) || lua_pcall(L, 0, -1, 0);
-	luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\empty.lua", NULL) || lua_pcall(L, 0, -1, 0);
+	luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\mod.lua", NULL) || lua_pcall(L, 0, -1, 0);
 
 	return ret_val;
 }

@@ -33,5 +33,6 @@
   <ItemGroup>
     <None Include="test.lua" />
     <None Include="empty.lua" />
+    <None Include="mod.lua" />
   </ItemGroup>
 </Project>

@@ -2,15 +2,11 @@ jit.off()
 
 FILE_PATH = "C:\\LuaJitHookLogs\\"
 STARTING_TIME = os.clock()
---gimmecache = {}
-GDUMPED = false
----blah = true
+---gimmecache = {}
+---GDUMPED = false
+GDUMPED = 0
+--gimmecache -= 1
 --gimmecache["a"] = "b"
----_G.oof = {}
-
---- Remember debug hook is commented out at the bottom
-
----blah blah bad!
 
 function pad(str, i)
     local result = str
@@ -27,9 +23,9 @@ function gimme(table, depth)
 
     --gimmecache.insert(table, true)
 
-    --if (table == _G and depth ~= 0) then
-        --return pad("..._G...\n", depth+1)
-    --end
+    if (table == _G and depth ~= 0) then
+        return pad("..._G...\n", depth+1)
+    end
     --if (depth > 999) then
     if (depth > 1) then
         return pad("...truncated...\n",depth+1)
@@ -49,10 +45,13 @@ end
 function dumpGlobals()
     local fname = FILE_PATH .. "globals_" .. STARTING_TIME .. ".txt"
 
+    my_print(gimme(_G, 0).. "\n\n\n\n\n\n\n\n\n")
+    --[[
     local globalsFile = io.open(fname, "w")
     globalsFile:write(gimme(_G, 0))
     globalsFile:flush()
     globalsFile:close()
+    ]]--
 end
 
 function trace(event, line)
@@ -62,11 +61,14 @@ function trace(event, line)
     if not info.name then return end
     if string.len(info.name) <= 1 then return end
 
-    if (not GDUMPED) then
+    if (GDUMPED == 10000) then
+        love.errhand = my_print
         dumpGlobals()
-        GDUMPED = true
     end
+
+    GDUMPED = GDUMPED + 1
     
+    --[[
     local fname = FILE_PATH .. "trace_" .. STARTING_TIME .. ".txt"
     local traceFile = io.open(fname, "a")
     traceFile:write(info.name .. "()\n")
@@ -82,6 +84,7 @@ function trace(event, line)
 
     traceFile:flush()
     traceFile:close()
+    ]]--
 end
 
----debug.sethook(trace, "c")
+debug.sethook(trace, "c")
