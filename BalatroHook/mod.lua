@@ -1,11 +1,26 @@
 jit.off()
 
-function initmod()
-    love.errhand = my_print
+originalupdate = nil
+firstUpdate = true
 
-    my_print(printtablerecursive(_G, 0))
+FILE_PATH = "C:\\LuaJitHookLogs\\balatroglobals.txt"
 
-    my_print("====Finished initmod!====\n")
+function updatemod(dt)
+    if (firstUpdate) then
+        love.errhand = my_print
+        my_print("First update...\n")
+
+		results = printtablerecursive(_G, 0)
+		local globalsFile = io.open(FILE_PATH, "w")
+		globalsFile:write(results)
+		globalsFile:flush()
+		globalsFile:close()
+
+        my_print("====Finished first update!====\n")
+        firstUpdate = false
+    end
+
+    originalupdate(dt)
 end
 
 function pad(str, i)
@@ -16,6 +31,15 @@ function pad(str, i)
     return result
 end
 
+function getInfo(n)
+    local info = debug.getinfo(n)
+    if (info.name == nil) then
+        return "nil"
+    else
+        return info.name
+    end
+end
+
 function getArgs(fun)
   local args = {}
   local hook = debug.gethook()
@@ -23,10 +47,9 @@ function getArgs(fun)
   local argHook = function( ... )
     local info = debug.getinfo(3)
     if 'pcall' ~= info.name then return end
-
     for i = 1, math.huge do
       local name, value = debug.getlocal(2, i)
-      if '(*temporary)' == name then
+      if name == nil or '(*temporary)' == name then
         debug.sethook(hook)
         error('')
         return
@@ -42,18 +65,18 @@ function getArgs(fun)
 end
 
 function printtablerecursive(table, depth)
-    if (table == _G and depth ~= 0) then
+    if ((table == _G or table==G) and depth ~= 0) then
         return pad("..._G...\n", depth+1)
     end
-    if (depth > 1) then
+    if (depth > 10) then
         return pad("...truncated...\n",depth+1)
     end
     local result = ""
     for k, v in pairs(table) do
 		result = result..pad(" "..k.." ("..type(v)..")".."\n", depth)
 		if (type(v) == "function") then
-			for i, j in pairs(getArgs(k)) do
-				result = result..pad(i.."\n", depth+1)
+			for i,j in pairs(getArgs(v)) do
+				result = result..pad(j.."\n", depth+1)
 			end
 		end
 		if type(v) == "table" then
@@ -63,8 +86,10 @@ function printtablerecursive(table, depth)
     return result
 end
 
-INITWAIT = 0
+--- MOD INIT ---
 
+INITWAIT = 0
+oghook = debug.gethook()
 function trace(event, line)
     local info = debug.getinfo(2)
 
@@ -72,12 +97,13 @@ function trace(event, line)
     if not info.name then return end
     if string.len(info.name) <= 1 then return end
 
-    --- BB find a nicer way to invoke initmod
+    if coroutine.running() ~= nil then return end
 
     if (INITWAIT == 10000) then
-        --- disable the hook and init the mod
-        debug.sethook(trace, "c", 0)
-        initmod()
+        originalupdate = love.update
+        INITWAIT = INITWAIT + 1
+        debug.sethook(oghook)
+        love.update = updatemod
     end
 
     INITWAIT = INITWAIT + 1

@@ -13,6 +13,18 @@ HMODULE m_hModule;
 #define LUA_ENVIRONINDEX        (-10001)
 #define LUA_GLOBALSINDEX        (-10002)
 
+// BB Really should just include lua.h so I don't have to manually write all this junk
+//  e.g. https://github.com/lua/lua/blob/master/lua.h but for 5.1
+
+#define LUA_OK		0
+#define LUA_YIELD	1
+#define LUA_ERRRUN	2
+#define LUA_ERRSYNTAX	3
+#define LUA_ERRMEM	4
+#define LUA_ERRERR	5
+
+#define LUA_ERRFILE     (LUA_ERRERR+1)
+
 #define DIM(arg) (sizeof(arg) / sizeof(*arg))
 
 BOOL Write(const char * pChz)
@@ -84,6 +96,8 @@ _lua_tolstring lua_tolstring;
 typedef lua_State * (*_lua_newstate)(lua_Alloc f, void *ud);
 _lua_newstate lua_newstate;
 
+int m_cJithooks = 0;
+
 int luaL_loadstring(lua_State * L, const char * str)
 {
 	Write("LoadString!\n");
@@ -93,8 +107,8 @@ int luaL_loadstring(lua_State * L, const char * str)
 
 int luaL_error(lua_State * L, const char * fmt, ...) 
 {
-	WriteFmt(fmt, va_list());
-	WriteFmt("Error!\n");
+	//WriteFmt(fmt, va_list());
+	Write("Error!\n");
 
 	int ret_val = luaL_error_original(L, fmt, va_list());
 	return ret_val;
@@ -109,13 +123,29 @@ int lua_my_print(lua_State * L)
 
 int luaopen_jit_hook(lua_State * L)
 {
-	Write("lauopen_jit_hook!\n");
 	int ret_val = luaopen_jit_original(L);
+
+	m_cJithooks++;
+	if (m_cJithooks > 1)
+		return ret_val;
+
+	Write("Loading mod...\n");
 
 	lua_pushcclosure(L, lua_my_print, 0);
 	lua_setfield(L, LUA_GLOBALSINDEX, "my_print");
 
-	luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\mod.lua", NULL) || lua_pcall(L, 0, -1, 0);
+	int loadfileret = luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\mod.lua", NULL);
+	//int loadfileret = luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\empty.lua", NULL);
+
+	if (loadfileret != LUA_OK)
+	{
+		WriteFmt("Error loading file! %s\n", lua_tolstring(L, 0, nullptr));
+	}
+	else 
+	{
+		Write("Loaded file correctly!\n");
+		lua_pcall(L, 0, -1, 0);
+	}
 
 	return ret_val;
 }
@@ -196,7 +226,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		DetourTransactionBegin();
 		DetourUpdateThread(GetCurrentThread());
 		DetourAttach(&luaopen_jit_original, luaopen_jit_hook);
-		DetourAttach(&luaL_error_original, luaL_error);
+		//DetourAttach(&luaL_error_original, luaL_error);
 		DetourAttach(&luaL_loadstring_original, luaL_loadstring);
 		DetourTransactionCommit();
 
@@ -209,7 +239,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		DetourTransactionBegin();
 		DetourUpdateThread(GetCurrentThread());
 		DetourDetach(&luaopen_jit_original, luaopen_jit_hook);
-		DetourDetach(&luaL_error_original, luaL_error);
+		//DetourDetach(&luaL_error_original, luaL_error);
 		DetourDetach(&luaL_loadstring_original, luaL_loadstring);
 		DetourTransactionCommit();
 	}
