@@ -5,18 +5,24 @@ firstUpdate = true
 
 FILE_PATH = "C:\\LuaJitHookLogs\\balatroglobals.txt"
 
+function dumpglobals()
+	objcache = {}
+	results = printtablerecursive(_G, 0, 1, "_G")
+	results = results.."\nMade by https://github.com/cmacmillan"
+	local globalsFile = io.open(FILE_PATH, "w")
+	globalsFile:write(results)
+	globalsFile:flush()
+	globalsFile:close()
+end
+
 function updatemod(dt)
     if (firstUpdate) then
         love.errhand = my_print
         my_print("First update...\n")
 
-        objcache = {}
-
-		results = printtablerecursive(_G, 0)
-		local globalsFile = io.open(FILE_PATH, "w")
-		globalsFile:write(results)
-		globalsFile:flush()
-		globalsFile:close()
+        ---dumpglobals()
+        ---_G.G.FUNCS.show_credits()
+        ---_G.G.FUNCS.show_credits()
 
         my_print("====Finished first update!====\n")
         firstUpdate = false
@@ -25,11 +31,34 @@ function updatemod(dt)
     originalupdate(dt)
 end
 
-function pad(str, i)
+function pad(str, suffix, path, i, linenum)
     local result = str
-    for c=0, i, 1 do
-        result = "  "..result
+    if (false) then
+		linestr = tostring(linenum-1)
+		for c=string.len(linestr), i+6, 1 do
+			result = "  "..result
+		end    
+		result = linestr..result
+    else
+		for c=0, i, 1 do
+			result = "  "..result
+		end    
     end
+
+	for c=string.len(result), 50, 1 do
+		result = result.." "
+	end
+	result = result..suffix
+
+
+    if (true) then -- set to false to not dump paths
+		for c=string.len(result), 130, 1 do
+			result = result.." "
+		end
+		result = result..path
+    end
+
+    result = result.."\n"
     return result
 end
 
@@ -66,27 +95,50 @@ function getArgs(fun)
   return args
 end
 
-function printtablerecursive(table, depth)
-    if (table == objcache or objcache[table] ~= nil) then
-        return pad("...\n", depth+1)
+function printtablerecursive(table, depth, linenum, path)
+    if (table == objcache) then
+        return "", linenum
     end
     if (depth > 10) then
-        return pad("...truncated...\n",depth+1)
+        return pad("...truncated due to depth", "", path, depth + 1, linenum), linenum+1
     end
+    objcache[table] = linenum
     local result = ""
     for k, v in pairs(table) do
-		result = result..pad(" "..k.." ("..type(v)..")".."\n", depth)
+        linenum = linenum + 1
 		if (type(v) == "function") then
+            name = k.."("
+            isFirst = true 
 			for i,j in pairs(getArgs(v)) do
-				result = result..pad(j.."\n", depth+1)
+                if (not isFirst) then
+                    name= name..", "
+                end
+                isFirst = false;
+				name = name..j
 			end
-		end
-		if type(v) == "table" then
-            objcache[table] = true
-			result = result..printtablerecursive(v, depth+1)
+            name = name..") (function)"
+            result = result..pad(name, "", path.."."..k, depth, linenum)
+		elseif type(v) == "table" then
+            if (objcache[v] ~= nil) then
+                result = result..pad(k.." (table) {line "..(objcache[v]-1).."}", "", path.."."..k, depth, linenum)
+            else
+                result = result..pad(k.." (table)", "", path.."."..k, depth, linenum)
+                concat, linenum = printtablerecursive(v, depth+1, linenum, path.."."..k)
+			    result = result..concat
+            end
+        else
+            suffix = ""
+            if (type(v) == "boolean") then
+                suffix = "= "..tostring(v) 
+            elseif (type(v) == "number") then
+                suffix = "= "..tostring(v) 
+            elseif (type(v) == "string") then
+                suffix = "= "..v:gsub("\n", "\\n")
+            end
+            result = result..pad(k.." ("..type(v)..") ", suffix, path.."."..k, depth, linenum)
 		end
     end
-    return result
+    return result, linenum
 end
 
 --- MOD INIT ---
