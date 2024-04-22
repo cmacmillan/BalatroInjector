@@ -10,6 +10,8 @@ function updatemod(dt)
         love.errhand = my_print
         my_print("First update...\n")
 
+        objcache = {}
+
 		results = printtablerecursive(_G, 0)
 		local globalsFile = io.open(FILE_PATH, "w")
 		globalsFile:write(results)
@@ -65,8 +67,8 @@ function getArgs(fun)
 end
 
 function printtablerecursive(table, depth)
-    if ((table == _G or table==G) and depth ~= 0) then
-        return pad("..._G...\n", depth+1)
+    if (table == objcache or objcache[table] ~= nil) then
+        return pad("...\n", depth+1)
     end
     if (depth > 10) then
         return pad("...truncated...\n",depth+1)
@@ -80,6 +82,7 @@ function printtablerecursive(table, depth)
 			end
 		end
 		if type(v) == "table" then
+            objcache[table] = true
 			result = result..printtablerecursive(v, depth+1)
 		end
     end
