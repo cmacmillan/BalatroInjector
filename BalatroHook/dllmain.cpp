@@ -226,7 +226,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		DetourTransactionBegin();
 		DetourUpdateThread(GetCurrentThread());
 		DetourAttach(&luaopen_jit_original, luaopen_jit_hook);
-		//DetourAttach(&luaL_error_original, luaL_error);
+		DetourAttach(&luaL_error_original, luaL_error);
 		DetourAttach(&luaL_loadstring_original, luaL_loadstring);
 		DetourTransactionCommit();
 
@@ -239,7 +239,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		DetourTransactionBegin();
 		DetourUpdateThread(GetCurrentThread());
 		DetourDetach(&luaopen_jit_original, luaopen_jit_hook);
-		//DetourDetach(&luaL_error_original, luaL_error);
+		DetourDetach(&luaL_error_original, luaL_error);
 		DetourDetach(&luaL_loadstring_original, luaL_loadstring);
 		DetourTransactionCommit();
 	}
