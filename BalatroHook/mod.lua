@@ -54,14 +54,26 @@ function mykeypressed(key)
 			fIsCursorVisible = true
         end
         if key == "return" then
-            result, err = loadstring("return "..currentInputText)
-            if (result == nil) then
-                my_print("Error running command!: "..err.."\n")
-                currentInputText = ""
+            if (currentInputText == "help") then
+                --- BB explain how to use return to read values, and show how to use add_joker
+                love.system.openURL("https://raw.githubusercontent.com/cmacmillan/BalatroInjector/master/balatroglobals.txt")
+			    currentInputText = ""
+                cursorIndex = 1
             else
-                currentInputText = tostring(result())
+				local result, err = loadstring(currentInputText)
+				if (result == nil) then
+					my_print("Error running command!: "..err.."\n") --- TODO don't put this here
+					currentInputText = ""
+				else
+                    local retr = result()
+                    if (retr ~= nil) then
+					    currentInputText = tostring(retr) --- TODO don't put this here
+                    else
+					    currentInputText = ""
+                    end
+				end
+				cursorIndex = 1
             end
-            cursorIndex = 1
         end
         if key == "backspace" then
             cursorIndex = math.max(1, cursorIndex - 1)
@@ -105,7 +117,7 @@ end
 function mydraw()
     originaldraw()
 
-	love.graphics.setColor (0,0,0)
+	love.graphics.setColor (0,0,0, .4)
     local screenWidth = love.graphics.getWidth();
     local font = love.graphics.getFont()
     textHeight = font.getHeight(font)
