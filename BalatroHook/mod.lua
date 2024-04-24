@@ -60,16 +60,22 @@ function mykeypressed(key)
 			    currentInputText = ""
                 cursorIndex = 1
             else
-				local result, err = loadstring(currentInputText)
-				if (result == nil) then
-					my_print("Error running command!: "..err.."\n") --- TODO don't put this here
+				local loadResult, loadErr= loadstring(currentInputText)
+				if (loadResult == nil) then
+					my_print("Error running command!: "..loadErr.."\n") --- TODO don't put this here
 					currentInputText = ""
 				else
-                    local retr = result()
-                    if (retr ~= nil) then
-					    currentInputText = tostring(retr) --- TODO don't put this here
+                    local callResult = {pcall(loadResult)}
+                    if (callResult[1] == true) then
+						if (callResult[2] ~= nil) then
+                            --- TODO handle multiple return properly
+							currentInputText = tostring(callResult[2]) --- TODO don't put this here
+						else
+							currentInputText = ""
+						end
                     else
-					    currentInputText = ""
+                        --- pcall failed
+					    currentInputText = callResult[2]
                     end
 				end
 				cursorIndex = 1
