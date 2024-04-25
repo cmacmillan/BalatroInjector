@@ -18,8 +18,20 @@ dTUntilNextCursorFlicker = 0
 dTBetweenCursorFlickers = .4
 fIsCursorVisible = true
 
+mpKeyDownToDTPressed = {}
+mpKeyDownToCRepeats = {}
+dTUntilFirstKeyRepeat = .4
+dTBetweenKeyRepeats = .025
+
+iCommandHistorySelected = 0
+cCommandsInHistory = 0
+commandHistory = {}
+---outputHistory = {}
+
 cursorIndex = 1
 currentInputText = ""
+
+selectCursorStartIndex = nil
 
 FILE_PATH = "C:\\LuaJitHookLogs\\balatroglobals.txt"
 
@@ -38,70 +50,198 @@ function unlockallachievements()
 	end
 end
 
+function leftpressed()
+	if (mpKeyDownToDTPressed["lshift"] or mpKeyDownToDTPressed["rshift"]) then
+        if (selectCursorStartIndex == nil) then
+            selectCursorStartIndex = cursorIndex 
+        end
+    else
+        selectCursorStartIndex = nil
+    end
+	cursorIndex = math.max(1, cursorIndex - 1)
+	dTUntilNextCursorFlicker = dTBetweenCursorFlickers
+	fIsCursorVisible = true
+end
+
+function rightpressed()
+	if (mpKeyDownToDTPressed["lshift"] or mpKeyDownToDTPressed["rshift"]) then
+        if (selectCursorStartIndex == nil) then
+            selectCursorStartIndex = cursorIndex 
+        end
+    else
+        selectCursorStartIndex = nil
+    end
+	cursorIndex = math.min(string.len(currentInputText) + 1, cursorIndex + 1)
+	dTUntilNextCursorFlicker = dTBetweenCursorFlickers
+	fIsCursorVisible = true
+end
+
+function uppressed()
+    iCommandHistorySelected = math.max(0, iCommandHistorySelected - 1)
+    if (iCommandHistorySelected == cCommandsInHistory) then
+        currentInputText = ""
+        cursorIndex = 1
+    else
+        currentInputText = commandHistory[iCommandHistorySelected]
+        cursorIndex = string.len(currentInputText) + 1
+    end
+end
+
+function downpressed()
+    iCommandHistorySelected = math.min(cCommandsInHistory, iCommandHistorySelected + 1)
+    if (iCommandHistorySelected == cCommandsInHistory) then
+        currentInputText = ""
+        cursorIndex = 1
+    else
+        currentInputText = commandHistory[iCommandHistorySelected]
+        cursorIndex = string.len(currentInputText) + 1
+    end
+end
+
+function noop()
+end
+
+function copy()
+	if (mpKeyDownToDTPressed["lctrl"] or mpKeyDownToDTPressed["rctrl"]) then
+        if (selectCursorStartIndex == cursorIndex) then
+            return
+        end
+
+		local selectLeftIndex = math.min(cursorIndex, selectCursorStartIndex)
+		local selectRightIndex = math.max(cursorIndex, selectCursorStartIndex)
+		love.system.setClipboardText(string.sub(currentInputText,selectLeftIndex,selectRightIndex-1))
+		selectCursorStartIndex = nil
+    end
+end
+
+function cut()
+	if (mpKeyDownToDTPressed["lctrl"] or mpKeyDownToDTPressed["rctrl"]) then
+        if (selectCursorStartIndex == nil or selectCursorStartIndex == cursorIndex) then
+            return
+        end
+
+ 		local selectLeftIndex = math.min(cursorIndex, selectCursorStartIndex)
+		local selectRightIndex = math.max(cursorIndex, selectCursorStartIndex)
+		love.system.setClipboardText(string.sub(currentInputText,selectLeftIndex,selectRightIndex-1))
+		currentInputText = string.sub(currentInputText,1,selectLeftIndex-1) .. string.sub(currentInputText,selectRightIndex)
+	    cursorIndex = selectLeftIndex
+		selectCursorStartIndex = nil       
+    end
+end
+
+function selectall()
+	if (mpKeyDownToDTPressed["lctrl"] or mpKeyDownToDTPressed["rctrl"]) then
+        cursorIndex = 1
+        selectCursorStartIndex = string.len(currentInputText) + 1
+    end
+end
+
+function paste()
+	if (mpKeyDownToDTPressed["lctrl"] or mpKeyDownToDTPressed["rctrl"]) then
+		local pastetext = string.gsub(love.system.getClipboardText(),"\n","")
+        if (selectCursorStartIndex ~= nil) then
+			local selectLeftIndex = math.min(cursorIndex, selectCursorStartIndex)
+			local selectRightIndex = math.max(cursorIndex, selectCursorStartIndex)
+			currentInputText = string.sub(currentInputText,1,selectLeftIndex-1) .. pastetext .. string.sub(currentInputText,selectRightIndex)
+			cursorIndex = selectLeftIndex + string.len(pastetext)
+			selectCursorStartIndex = nil
+        else
+			currentInputText = string.sub(currentInputText,1,cursorIndex-1) .. pastetext .. string.sub(currentInputText,cursorIndex)
+			cursorIndex = cursorIndex + string.len(pastetext)
+        end
+
+		dTUntilNextCursorFlicker = dTBetweenCursorFlickers
+		fIsCursorVisible = true
+	end
+end
+
+function returnpressed()
+    commandHistory[cCommandsInHistory] = currentInputText
+    cCommandsInHistory = cCommandsInHistory + 1
+    iCommandHistorySelected = cCommandsInHistory
+	if (currentInputText == "help") then
+		--- BB explain how to use return to read values, and show how to use add_joker
+		love.system.openURL("https://raw.githubusercontent.com/cmacmillan/BalatroInjector/master/balatroglobals.txt")
+	else
+		local loadResult, loadErr= loadstring(currentInputText)
+		if (loadResult == nil) then
+			my_print("Error running command!: "..loadErr.."\n") --- TODO don't put this here
+			currentInputText = ""
+		else
+			local callResult = {pcall(loadResult)}
+			if (callResult[1] == true) then
+				if (callResult[2] ~= nil) then
+					--- TODO handle multiple return properly
+					---tostring(callResult[2]) --- TODO don't put this here
+				else
+					--- TODO
+				end
+			else
+				-- callResult[2] --- TODO print out
+			end
+		end
+	end
+    cursorIndex = 1
+    currentInputText = ""
+end
+
+function backspacepressed()
+	if (selectCursorStartIndex ~= nil) then
+		local selectLeftIndex = math.min(cursorIndex, selectCursorStartIndex)
+		local selectRightIndex = math.max(cursorIndex, selectCursorStartIndex)
+		currentInputText = string.sub(currentInputText,1,selectLeftIndex-1) .. string.sub(currentInputText,selectRightIndex)
+		selectCursorStartIndex = nil
+		cursorIndex = selectLeftIndex
+	else
+        if (cursorIndex > 1) then
+			cursorIndex = math.max(1, cursorIndex - 1)
+			currentInputText = string.sub(currentInputText,1,cursorIndex-1) .. string.sub(currentInputText,cursorIndex+1)
+        end
+	end
+	dTUntilNextCursorFlicker = dTBetweenCursorFlickers
+	fIsCursorVisible = true
+end
+
+mpKeyNameToFunc = 
+{
+    ["left"]        = leftpressed,
+    ["right"]       = rightpressed,
+    ["up"]          = uppressed,
+    ["down"]        = downpressed,
+    ["return"]      = returnpressed,
+    ["backspace"]   = backspacepressed,
+    ["lctrl"]       = noop,
+    ["rctrl"]       = noop,
+    ["lshift"]      = noop,
+    ["rshift"]      = noop,
+    ["v"]           = paste,
+    ["c"]           = copy,
+    ["x"]           = cut,
+    ["a"]           = selectall
+}
+
 function mykeypressed(key)
     if key == "f5" then
         fIsConsoleOpen = not fIsConsoleOpen 
     end
     if (fIsConsoleOpen) then
-        if key == "left" then
-            cursorIndex = math.max(1, cursorIndex - 1)
-			dTUntilNextCursorFlicker = dTBetweenCursorFlickers
-			fIsCursorVisible = true
-        end
-        if key == "right" then
-            cursorIndex = math.min(string.len(currentInputText) + 1, cursorIndex + 1)
-            dTUntilNextCursorFlicker = dTBetweenCursorFlickers
-			fIsCursorVisible = true
-        end
-        if key == "return" then
-            if (currentInputText == "help") then
-                --- BB explain how to use return to read values, and show how to use add_joker
-                love.system.openURL("https://raw.githubusercontent.com/cmacmillan/BalatroInjector/master/balatroglobals.txt")
-			    currentInputText = ""
-                cursorIndex = 1
-            else
-				local loadResult, loadErr= loadstring(currentInputText)
-				if (loadResult == nil) then
-					my_print("Error running command!: "..loadErr.."\n") --- TODO don't put this here
-					currentInputText = ""
-				else
-                    local callResult = {pcall(loadResult)}
-                    if (callResult[1] == true) then
-						if (callResult[2] ~= nil) then
-                            --- TODO handle multiple return properly
-							currentInputText = tostring(callResult[2]) --- TODO don't put this here
-						else
-							currentInputText = ""
-						end
-                    else
-                        --- pcall failed
-					    currentInputText = callResult[2]
-                    end
-				end
-				cursorIndex = 1
-            end
-        end
-        if key == "backspace" then
-            cursorIndex = math.max(1, cursorIndex - 1)
-            currentInputText = string.sub(currentInputText,1,cursorIndex-1) .. string.sub(currentInputText,cursorIndex+1)
-            dTUntilNextCursorFlicker = dTBetweenCursorFlickers
-			fIsCursorVisible = true
+        local func = mpKeyNameToFunc[key]
+        if (func ~= nil) then
+            mpKeyDownToDTPressed[key] = 0
+            mpKeyDownToCRepeats[key] = 1
+            func()
         end
     end
-   ---_G.G.FUNCS.reroll_shop()
-   ---if key == "f4" then
-        ---my_print(printtable(_G.find_joker("Baron",true), "", false))
-        ---my_print(printtable(_G.find_joker("j_baron",true), "", false))
-        ---my_print(printtable(_G.find_joker("asdf",true), "", false))
-        ---_G.add_joker("j_baron")
-        ---_G.add_joker("j_mime")
-   ---end
-   if (not fIsConsoleOpen) then
+    if (not fIsConsoleOpen) then
         originalkeypressed(key)
     end
 end
 
 function mykeyreleased( key )
+    if (fIsConsoleOpen) then
+        mpKeyDownToDTPressed[key] = nil
+        mpKeyDownToCRepeats[key] = nil
+    end
     if (not fIsConsoleOpen) then
         originalkeyrelease(key)
     end
@@ -109,8 +249,16 @@ end
 
 function mytextinput(text)
     if (fIsConsoleOpen) then
-        currentInputText = string.sub(currentInputText,1,cursorIndex-1) .. text .. string.sub(currentInputText,cursorIndex)
-        cursorIndex = cursorIndex + 1
+        if (selectCursorStartIndex ~= nil) then
+			local selectLeftIndex = math.min(cursorIndex, selectCursorStartIndex)
+			local selectRightIndex = math.max(cursorIndex, selectCursorStartIndex)
+		    currentInputText = string.sub(currentInputText,1,selectLeftIndex-1) .. text .. string.sub(currentInputText,selectRightIndex)
+            selectCursorStartIndex = nil
+            cursorIndex = selectLeftIndex
+        else
+		    currentInputText = string.sub(currentInputText,1,cursorIndex-1) .. text .. string.sub(currentInputText,cursorIndex)
+        end
+		cursorIndex = cursorIndex + 1
 		dTUntilNextCursorFlicker = dTBetweenCursorFlickers
 		fIsCursorVisible = true
     else
@@ -134,11 +282,28 @@ function mydraw()
         fIsCursorVisible = not fIsCursorVisible
     end
 
+    textTopY = currentConsoleHeight - textHeight - consoleBottomPadding
+    textBottomY = textTopY + textHeight
+	cursorTopLeftX = consoleLeftPadding + font:getWidth(string.sub(currentInputText,1,cursorIndex-1))
+
+    if (selectCursorStartIndex) then
+        local selectLeftX = nil
+        local selectRightX = nil
+	    local selectX = consoleLeftPadding + font:getWidth(string.sub(currentInputText,1,selectCursorStartIndex-1))
+        if (cursorIndex < selectCursorStartIndex) then
+			selectLeftX = cursorTopLeftX
+			selectRightX = selectX
+        else
+			selectLeftX = selectX
+			selectRightX = cursorTopLeftX
+        end
+	    love.graphics.setColor (.4,.4,1, 1)
+		love.graphics.polygon("fill", selectLeftX,textTopY, selectRightX,textTopY, selectRightX,textBottomY, selectLeftX,textBottomY)
+    end
+
 	love.graphics.setColor (1,1,1)
     if (fIsCursorVisible) then
-		cursorTopLeftX = consoleLeftPadding + font:getWidth(string.sub(currentInputText,1,cursorIndex-1))
-		cursorTopLeftY = currentConsoleHeight - textHeight - consoleBottomPadding
-		love.graphics.polygon("fill", cursorTopLeftX, cursorTopLeftY, cursorTopLeftX+cursorWidth,cursorTopLeftY, cursorTopLeftX+cursorWidth,cursorTopLeftY+textHeight, cursorTopLeftX,cursorTopLeftY+textHeight)
+		love.graphics.polygon("fill", cursorTopLeftX, textTopY, cursorTopLeftX+cursorWidth,textTopY, cursorTopLeftX+cursorWidth,textBottomY, cursorTopLeftX,textBottomY)
     end
 
     love.graphics.printf(currentInputText, consoleLeftPadding, currentConsoleHeight - textHeight - consoleBottomPadding, love.graphics.getWidth())
@@ -163,7 +328,7 @@ function updatemod(dt)
 		originalkeypressed = love.keypressed
 		originalkeyrelease = love.keyreleased
         love.keypressed = mykeypressed
-        love.keyreleased = mykeyrelease
+        love.keyreleased = mykeyreleased
 
         originaldraw = love.draw
         love.draw = mydraw
@@ -185,12 +350,19 @@ function updatemod(dt)
     currentConsoleHeight = movetowards(currentConsoleHeight,targetConsoleHeight,dt*maxConsoleHeight*10)
 
     dTUntilNextCursorFlicker = dTUntilNextCursorFlicker - dt
+    for i, j in pairs(mpKeyDownToDTPressed) do
+        mpKeyDownToDTPressed[i] = j + dt
+        local dTSinceFirstRepeat = mpKeyDownToDTPressed[i] - dTUntilFirstKeyRepeat
+        if (dTSinceFirstRepeat > 0) then
+            local cRepeats = math.floor(dTSinceFirstRepeat / dTBetweenKeyRepeats)
+            for c = mpKeyDownToCRepeats[i], cRepeats do
+                mpKeyNameToFunc[i]()
+            end
+            mpKeyDownToCRepeats[i] = cRepeats + 1
+        end
+    end
 
-    --- Pause while the console is open
-
-    ---if (not fIsConsoleOpen) then
-        originalupdate(dt)
-    ---end
+    originalupdate(dt)
 end
 
 function pad(str, suffix, path, i, linenum, showpath)
