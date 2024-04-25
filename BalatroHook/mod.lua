@@ -202,6 +202,20 @@ function backspacepressed()
 	fIsCursorVisible = true
 end
 
+function deletepressed()
+	if (selectCursorStartIndex ~= nil) then
+		local selectLeftIndex = math.min(cursorIndex, selectCursorStartIndex)
+		local selectRightIndex = math.max(cursorIndex, selectCursorStartIndex)
+		currentInputText = string.sub(currentInputText,1,selectLeftIndex-1) .. string.sub(currentInputText,selectRightIndex)
+		selectCursorStartIndex = nil
+		cursorIndex = selectLeftIndex
+	else
+		currentInputText = string.sub(currentInputText,1,cursorIndex-1) .. string.sub(currentInputText,cursorIndex+1)
+	end
+	dTUntilNextCursorFlicker = dTBetweenCursorFlickers
+	fIsCursorVisible = true
+end
+
 mpKeyNameToFunc = 
 {
     ["left"]        = leftpressed,
@@ -210,6 +224,7 @@ mpKeyNameToFunc =
     ["down"]        = downpressed,
     ["return"]      = returnpressed,
     ["backspace"]   = backspacepressed,
+    ["delete"]      = deletepressed,
     ["lctrl"]       = noop,
     ["rctrl"]       = noop,
     ["lshift"]      = noop,
@@ -321,7 +336,7 @@ end
 
 function updatemod(dt)
     if (firstUpdate) then
-        my_print("First update...\n")
+        my_print("Mod loaded!\n")
 
         love.errhand = my_print
 
@@ -338,7 +353,6 @@ function updatemod(dt)
 
         ---dumpglobals()
         
-        my_print("====Finished first update!====\n")
         firstUpdate = false
     end
 

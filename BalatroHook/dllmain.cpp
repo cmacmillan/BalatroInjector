@@ -139,11 +139,11 @@ int luaopen_jit_hook(lua_State * L)
 
 	if (loadfileret != LUA_OK)
 	{
-		WriteFmt("Error loading file! %s\n", lua_tolstring(L, 0, nullptr));
+		WriteFmt("Error loading lua file! %s\n", lua_tolstring(L, 0, nullptr));
 	}
 	else 
 	{
-		Write("Loaded file correctly!\n");
+		Write("Loaded lua file!\n");
 		lua_pcall(L, 0, -1, 0);
 	}
 
