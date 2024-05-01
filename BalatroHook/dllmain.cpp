@@ -135,6 +135,7 @@ int luaopen_jit_hook(lua_State * L)
 	lua_setfield(L, LUA_GLOBALSINDEX, "my_print");
 
 	int loadfileret = luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\mod.lua", NULL);
+	//int loadfileret = luaL_loadfilex(L, "C:\\Users\\H8801\\Desktop\\adasdads\\BalatroConsolePortable\\BalatroConsolePortable\\mod.lua", NULL);
 	//int loadfileret = luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\empty.lua", NULL);
 
 	if (loadfileret != LUA_OK)

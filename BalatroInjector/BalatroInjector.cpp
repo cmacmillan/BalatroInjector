@@ -6,8 +6,51 @@
 #include <tchar.h>
 #include <strsafe.h>
 
+#define DIM(arg) (sizeof(arg) / sizeof(*arg))
+
 LPCTSTR lpctstrSlot = TEXT("\\\\.\\mailslot\\BalatroInjector");
 HANDLE m_hProcess;
+
+#define EVADE_WINDOWS_DEFENDER 0
+
+#if EVADE_WINDOWS_DEFENDER
+//kernel32.dll
+//						  0     1    2    3    4    5    6    7    8    9   10   11   12   13   14   15   16    17
+wchar_t mpCharWChar[] = { 'q', '2', '3', 'k', 'l', 'e', 'r', 'd', 'o', 'a', 'b', 'y', 'i', 'L', 'n', '.', '\0', 'A'};
+
+//					   k  e  r  n   e  l  3  2  .   d  l  l  \0  junk junk junk
+//int aiModuleName[] = { 3, 5, 6, 14, 5, 4, 2, 1, 15, 7, 4, 4, 16, 0, 6, 7, 8, 10};
+int aiModuleName[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+//					     L   o, a, d  L   i   b   r  a  r  y   A   \0  junk junk junk
+//int aiFunctionName[] = { 13, 8, 9, 7, 13, 12, 10, 6, 9, 6, 11, 17, 16, 2, 1, 13,15};
+int aiFunctionName[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+wchar_t moduleName[DIM(aiModuleName)];
+char functionName[DIM(aiFunctionName)];
+
+void BuildStrings() 
+{
+	for (int i = 0; i < DIM(aiModuleName); i++) 
+	{
+		moduleName[i] = mpCharWChar[aiModuleName[i]];
+	}
+	for (int i = 0; i < DIM(aiFunctionName); i++) 
+	{
+		functionName[i] = char(mpCharWChar[aiFunctionName[i]]);
+	}
+}
+
+LPCWSTR lpModuleName() 
+{
+	return (LPCWSTR) &moduleName;
+}
+
+LPCSTR lpProcName() 
+{
+	return (LPCSTR) &functionName;
+}
+#endif
 
 int main(int argc, const char * argv[])
 {
@@ -16,6 +59,8 @@ int main(int argc, const char * argv[])
 		printf("Usage: Injector <exepath> <dllpath>\n");
 		return 0;
 	}
+
+	printf("Starting injector...\n");
 
 	//TerminateProcess(m_hProcess, 1);
 
@@ -37,6 +82,8 @@ int main(int argc, const char * argv[])
 	PROCESS_INFORMATION pi;
 	ZeroMemory(&pi, sizeof(pi));
 
+	printf("Launching balatro...\n");
+
 	if (!CreateProcessA(
 			pChzBalatroPath,
 			nullptr,
@@ -50,7 +97,7 @@ int main(int argc, const char * argv[])
 			&pi)
 		) 
 	{
-		printf("Error starting process!");
+		printf("Error launching balatro!");
 		return 1;
 	}
 
@@ -58,9 +105,11 @@ int main(int argc, const char * argv[])
 
 	if (!m_hProcess)
 	{
-		printf("Error opening process (%u)\n", GetLastError());
+		printf("Error opening balatro (%u)\n", GetLastError());
 		return 1;
 	}
+
+	printf("Allocating dll memory...\n");
 
 	LPVOID p = VirtualAllocEx(
 				m_hProcess, 
@@ -74,6 +123,8 @@ int main(int argc, const char * argv[])
 		return 1;
 	}
 
+	printf("Writing dll memory...\n");
+
 	WriteProcessMemory(
 		m_hProcess, 
 		p, 
@@ -81,6 +132,19 @@ int main(int argc, const char * argv[])
 		strlen(pChzDllPath) + 1, 
 		nullptr);
 
+	printf("Creating remote thread...\n");
+
+#if EVADE_WINDOWS_DEFENDER
+	BuildStrings();
+	HANDLE hThread = CreateRemoteThread(
+						m_hProcess, 
+						nullptr, 
+						0, 
+						(LPTHREAD_START_ROUTINE) GetProcAddress(GetModuleHandle(lpModuleName()), lpProcName()),
+						p,
+						0,
+						nullptr);
+#else
 	HANDLE hThread = CreateRemoteThread(
 						m_hProcess, 
 						nullptr, 
@@ -89,11 +153,15 @@ int main(int argc, const char * argv[])
 						p,
 						0,
 						nullptr);
+#endif
+
 	if (!hThread) 
 	{
 		printf("Error creating thread!\n");
 		return 1;
 	}
+
+	printf("Waiting for thread...\n");
 
 	DWORD waitResult = WaitForSingleObject(hThread, 5000);
 
@@ -101,6 +169,8 @@ int main(int argc, const char * argv[])
 	{
 		printf("Error waiting for single object!\n");
 	}
+
+	printf("Resuming balatro...\n");
 	
 	ResumeThread(pi.hThread);
 

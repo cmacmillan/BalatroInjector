@@ -8,9 +8,11 @@ originaltextinput = nil
 firstUpdate = true
 
 currentConsoleHeight = 0
-maxConsoleHeight = 200
-fIsConsoleOpen = false
-consoleLeftPadding = 20
+nonFullscreenConsoleHeight = 250
+fIsConsoleOpen = true
+fPreferConsoleFullscreen = false
+
+consoleLeftPadding = 60
 consoleBottomPadding = 5
 cursorWidth = 2
 
@@ -26,7 +28,10 @@ dTBetweenKeyRepeats = .025
 iCommandHistorySelected = 0
 cCommandsInHistory = 0
 commandHistory = {}
----outputHistory = {}
+
+cOutputHistory = 0
+outputHistory = {}
+outputHistoryLineCount = {}
 
 cursorIndex = 1
 currentInputText = ""
@@ -35,8 +40,10 @@ selectCursorStartIndex = nil
 
 FILE_PATH = "C:\\LuaJitHookLogs\\balatroglobals.txt"
 
+strHistoryFilePath = "balatroconsolehistory.txt"
+
 function dumpglobals()
-	local results = printtable(_G, "_G", false)
+	local results = stringfromtable(_G, "_G", true, true, 5)
 	results = results.."\nMade by https://github.com/cmacmillan"
 	local globalsFile = io.open(FILE_PATH, "w")
 	globalsFile:write(results)
@@ -138,7 +145,7 @@ end
 
 function paste()
 	if (mpKeyDownToDTPressed["lctrl"] or mpKeyDownToDTPressed["rctrl"]) then
-		local pastetext = string.gsub(love.system.getClipboardText(),"\n","")
+		local pastetext = string.gsub(love.system.getClipboardText(),"\n"," ")
         if (selectCursorStartIndex ~= nil) then
 			local selectLeftIndex = math.min(cursorIndex, selectCursorStartIndex)
 			local selectRightIndex = math.max(cursorIndex, selectCursorStartIndex)
@@ -155,31 +162,103 @@ function paste()
 	end
 end
 
-function returnpressed()
-    commandHistory[cCommandsInHistory] = currentInputText
+function split(str, strDelim)
+   if strDelim == nil then
+      return nil
+   end
+   local t={}
+   for str in string.gmatch(str, "([^"..strDelim.."]+)") do
+      table.insert(t, str)
+   end
+   return t
+end
+
+function loadconsolehistory()
+    local info = love.filesystem.getInfo(strHistoryFilePath)
+    if (info == nil) then
+        local file = love.filesystem.newFile(strHistoryFilePath)
+		file:open("w")
+		file:close()
+    else
+        local strContents = love.filesystem.read(strHistoryFilePath)
+        local tSplit = split(strContents,"\n")
+        for i,j in pairs(tSplit) do
+            addCommandToHistory(j)
+        end
+    end
+end
+
+function printconsole(text)
+    outputHistory[cOutputHistory] = text
+
+    local cNewlines = 0
+    for i in string.gmatch(text, "\n") do 
+        cNewlines = cNewlines + 1
+    end
+    outputHistoryLineCount[cOutputHistory] = cNewlines
+
+    cOutputHistory = cOutputHistory + 1
+end
+
+function printhelp()
+    printconsole("\tWelcome to the balatro console!")
+    printconsole("\tPress f5 to open/close the console. Press f6 to open the console in fullscreen mode.")
+    printconsole("\tRun 'globals' to open a webpage which documents global variables. Run 'help' to print this help text.")
+    printconsole("\tTry running 'add_joker(\"j_baron\")' to spawn in a joker.")
+    printconsole("\tOr try running 'G.FUNCS.reroll_shop()' when in a shop")
+    printconsole("\tThis console supports any lua commands, including loops, functions, etc.")
+end
+
+function addCommandToHistory(strCommand)
+    commandHistory[cCommandsInHistory] = strCommand 
     cCommandsInHistory = cCommandsInHistory + 1
     iCommandHistorySelected = cCommandsInHistory
+end
+
+function returnpressed()
+    printconsole(currentInputText)
+
+    addCommandToHistory(currentInputText)
+    --- Write into history file (assume it already exists since we created it when loading the history)
+    love.filesystem.append(strHistoryFilePath, currentInputText.."\n")
+    
+
 	if (currentInputText == "help") then
-		--- BB explain how to use return to read values, and show how to use add_joker
+        printhelp()
+	elseif (currentInputText == "globals") then
 		love.system.openURL("https://raw.githubusercontent.com/cmacmillan/BalatroInjector/master/balatroglobals.txt")
+	elseif (currentInputText == "clear" or currentInputText == "cls") then
+        for i,j in pairs(outputHistory) do
+		    outputHistory[i] = nil
+            outputHistoryLineCount[i] = nil
+        end
+		cOutputHistory = 0
 	else
-		local loadResult, loadErr= loadstring(currentInputText)
+		local loadResult, loadErr = loadstring("return "..currentInputText)
 		if (loadResult == nil) then
-			my_print("Error running command!: "..loadErr.."\n") --- TODO don't put this here
-			currentInputText = ""
-		else
+		    loadResult, loadErr = loadstring(currentInputText)
+            if (loadResult == nil) then
+				printconsole("\tError: "..loadErr)
+				currentInputText = ""
+            end
+		end
+
+        if (loadResult) then
 			local callResult = {pcall(loadResult)}
 			if (callResult[1] == true) then
-				if (callResult[2] ~= nil) then
-					--- TODO handle multiple return properly
-					---tostring(callResult[2]) --- TODO don't put this here
-				else
-					--- TODO
+				for i,j in pairs(callResult) do
+					if i > 1 then
+                        if (type(j) == "table") then
+						    printconsole("\t"..stringfromtable(j))
+                        else
+						    printconsole("\t"..tostring(j))
+                        end
+					end
 				end
 			else
-				-- callResult[2] --- TODO print out
+				printconsole("\tError: "..callResult[2])
 			end
-		end
+        end
 	end
     cursorIndex = 1
     currentInputText = ""
@@ -237,7 +316,19 @@ mpKeyNameToFunc =
 
 function mykeypressed(key)
     if key == "f5" then
-        fIsConsoleOpen = not fIsConsoleOpen 
+        if (fPreferConsoleFullscreen) then
+            fPreferConsoleFullscreen = false
+            fIsConsoleOpen = true
+        else
+            fIsConsoleOpen = not fIsConsoleOpen 
+        end
+    elseif key == "f6" then
+        if (not fPreferConsoleFullscreen) then
+            fPreferConsoleFullscreen = true
+            fIsConsoleOpen = true
+        else
+            fIsConsoleOpen = not fIsConsoleOpen 
+        end
     end
     if (fIsConsoleOpen) then
         local func = mpKeyNameToFunc[key]
@@ -286,7 +377,7 @@ end
 function mydraw()
     originaldraw()
 
-	love.graphics.setColor (0,0,0, .4)
+	love.graphics.setColor (0,0,0, .5)
     local screenWidth = love.graphics.getWidth();
     local font = love.graphics.getFont()
     textHeight = font.getHeight(font)
@@ -321,7 +412,19 @@ function mydraw()
 		love.graphics.polygon("fill", cursorTopLeftX, textTopY, cursorTopLeftX+cursorWidth,textTopY, cursorTopLeftX+cursorWidth,textBottomY, cursorTopLeftX,textBottomY)
     end
 
-    love.graphics.printf(currentInputText, consoleLeftPadding, currentConsoleHeight - textHeight - consoleBottomPadding, love.graphics.getWidth())
+    local inputTextYPosition = currentConsoleHeight - textHeight - consoleBottomPadding
+
+    love.graphics.printf(currentInputText, consoleLeftPadding, inputTextYPosition, love.graphics.getWidth())
+	love.graphics.setColor (.9,.9,.9)
+    local textHeightPadded = textHeight + 2
+    ---local yOffset = -20 - cOutputHistory * textHeightPadded
+    ---for i,j in pairs(outputHistory) do
+        ---yOffset = yOffset + textHeightPadded + outputHistoryLineCount[i] * textHeightPadded
+    local yOffset = inputTextYPosition
+    for i=cOutputHistory-1, 0, -1 do
+        yOffset = yOffset + -textHeightPadded * (1+outputHistoryLineCount[i])
+        love.graphics.printf(outputHistory[i], consoleLeftPadding, yOffset, love.graphics.getWidth())
+    end
 end
 
 function movetowards(current, target, amount)
@@ -340,6 +443,8 @@ function updatemod(dt)
 
         love.errhand = my_print
 
+        ---dumpglobals()
+
 		originalkeypressed = love.keypressed
 		originalkeyrelease = love.keyreleased
         love.keypressed = mykeypressed
@@ -351,17 +456,22 @@ function updatemod(dt)
         originaltextinput = love.textinput
         love.textinput = mytextinput
 
-        ---dumpglobals()
+        loadconsolehistory()
+        printhelp()
         
         firstUpdate = false
     end
 
     local targetConsoleHeight = 0
     if (fIsConsoleOpen) then
-        targetConsoleHeight = maxConsoleHeight
+        if (fPreferConsoleFullscreen) then
+            targetConsoleHeight = love.graphics.getHeight();
+        else
+            targetConsoleHeight = nonFullscreenConsoleHeight 
+        end
     end
 
-    currentConsoleHeight = movetowards(currentConsoleHeight,targetConsoleHeight,dt*maxConsoleHeight*10)
+    currentConsoleHeight = movetowards(currentConsoleHeight,targetConsoleHeight,dt*love.graphics.getHeight()*3)
 
     dTUntilNextCursorFlicker = dTUntilNextCursorFlicker - dt
     for i, j in pairs(mpKeyDownToDTPressed) do
@@ -443,21 +553,36 @@ function getArgs(fun)
   return args
 end
 
-function printtable(table, path, showpath)
+function printtable(table)
+    printconsole(stringfromtable(table))
+end
+
+function stringfromtable(table, path, showpath, showline, maxdepth)
+    if (showpath == nil) then
+        showpath = false
+    end
+    if (path == nil) then
+        path = ""
+    end
+    if (showline == nil) then
+        showline = false
+    end
+    if (maxdepth == nil) then
+        maxdepth = 1
+    end
 	objcache = {}
-	local results, linenum = printtablerecursive(table, 0, 1, path, showpath)
+	local results, linenum = printtablerecursive(table, 0, 1, path, showpath, showline, maxdepth)
     return results
 end
 
-function printtablerecursive(table, depth, linenum, path, showpath)
+function printtablerecursive(table, depth, linenum, path, showpath, showline, maxdepth)
     if (table == objcache) then
         return "", linenum
     end
 	if next(table) == nil then
-        --- BB this isn't super nice...
         return pad("Empty table", "", depth + 1, linenum, showpath), linenum+1
 	end
-    if (depth > 10) then
+    if (depth >= maxdepth) then
         return pad("...truncated due to depth", "", path, depth + 1, linenum, showpath), linenum+1
     end
     objcache[table] = linenum
@@ -478,10 +603,14 @@ function printtablerecursive(table, depth, linenum, path, showpath)
             result = result..pad(name, "", path.."."..k, depth, linenum, showpath)
 		elseif type(v) == "table" then
             if (objcache[v] ~= nil) then
-                result = result..pad(k.." (table) {line "..(objcache[v]-1).."}", "", path.."."..k, depth, linenum, showpath)
+                if (showline) then
+                    result = result..pad(k.." (table)", "", path.."."..k, depth, linenum, showpath)
+				else
+                    result = result..pad(k.." (table) {line "..(objcache[v]-1).."}", "", path.."."..k, depth, linenum, showpath)
+				end
             else
                 result = result..pad(k.." (table)", "", path.."."..k, depth, linenum, showpath)
-                concat, linenum = printtablerecursive(v, depth+1, linenum, path.."."..k, showpath)
+                concat, linenum = printtablerecursive(v, depth+1, linenum, path.."."..k, showpath, showline, maxdepth)
 			    result = result..concat
             end
         else
