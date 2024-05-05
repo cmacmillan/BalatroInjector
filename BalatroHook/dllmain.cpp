@@ -4,10 +4,11 @@
 #include <detours.h>
 #include <stdio.h>
 
-LPCTSTR lpctstrSlot = TEXT("\\\\.\\mailslot\\BalatroInjector");
+#include "common.h"
 
-HANDLE m_hMailslot;
+HANDLE m_hMailslotWrite;
 HMODULE m_hModule;
+char * m_pChzLuaPath = nullptr;
 
 #define LUA_REGISTRYINDEX       (-10000)
 #define LUA_ENVIRONINDEX        (-10001)
@@ -25,8 +26,6 @@ HMODULE m_hModule;
 
 #define LUA_ERRFILE     (LUA_ERRERR+1)
 
-#define DIM(arg) (sizeof(arg) / sizeof(*arg))
-
 BOOL Write(const char * pChz)
 {
 	BOOL fResult;
@@ -34,7 +33,7 @@ BOOL Write(const char * pChz)
 
 	LPCSTR lpcstr = pChz;
 
-	fResult = WriteFile(m_hMailslot,
+	fResult = WriteFile(m_hMailslotWrite,
 		lpcstr,
 		(DWORD) (strlen(lpcstr) + 1) * sizeof(CHAR),
 		&cbWritten,
@@ -130,13 +129,13 @@ int luaopen_jit_hook(lua_State * L)
 		return ret_val;
 
 	Write("Loading mod...\n");
+	WriteFmt("    Mod path: %s\n", m_pChzLuaPath);
 
 	lua_pushcclosure(L, lua_my_print, 0);
 	lua_setfield(L, LUA_GLOBALSINDEX, "my_print");
 
-	int loadfileret = luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\mod.lua", NULL);
-	//int loadfileret = luaL_loadfilex(L, "C:\\Users\\H8801\\Desktop\\adasdads\\BalatroConsolePortable\\BalatroConsolePortable\\mod.lua", NULL);
-	//int loadfileret = luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\empty.lua", NULL);
+	//int loadfileret = luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\mod.lua", NULL);
+	int loadfileret = luaL_loadfilex(L, m_pChzLuaPath, NULL);
 
 	if (loadfileret != LUA_OK)
 	{
@@ -163,7 +162,12 @@ BOOL FTryFindFARPROCFromPchz(const char * pChz, FARPROC * pFarproc)
 	return TRUE;
 }
 
-//MessageBox(nullptr, L"Error: Didn't find module", L"Result", MB_ICONINFORMATION);
+void ReceiveMailslotMessage(LPSTR lpstr) 
+{
+	const int cCharBuffer = 1024;
+	m_pChzLuaPath = new char[cCharBuffer];
+	memcpy_s(m_pChzLuaPath, cCharBuffer, lpstr, strlen(lpstr));
+}
 
 BOOL APIENTRY DllMain(HMODULE hModule,
 	DWORD  dwReason,
@@ -173,20 +177,34 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	{
 	case DLL_PROCESS_ATTACH:
 	{
-		m_hMailslot = CreateFile(lpctstrSlot,
-			GENERIC_WRITE,
-			FILE_SHARE_READ,
-			(LPSECURITY_ATTRIBUTES) NULL,
-			OPEN_EXISTING,
-			FILE_ATTRIBUTE_NORMAL,
-			(HANDLE) NULL);
+		m_hMailslotWrite = CreateFile(lpctstrSlotFromDll,
+							GENERIC_WRITE,
+							FILE_SHARE_READ,
+							(LPSECURITY_ATTRIBUTES) NULL,
+							OPEN_EXISTING,
+							FILE_ATTRIBUTE_NORMAL,
+							(HANDLE) NULL);
 
-		if (m_hMailslot == INVALID_HANDLE_VALUE)
+		if (m_hMailslotWrite == INVALID_HANDLE_VALUE)
 		{
 			return FALSE;
 		}
 
-		Write("Created mailslot!\n");
+		Write("Created write mailslot!\n");
+
+		HANDLE hMailslotRead = CreateMailslot(lpctstrSlotToDll, 0, MAILSLOT_WAIT_FOREVER, nullptr);
+
+		if (hMailslotRead == INVALID_HANDLE_VALUE) 
+		{ 
+			printf("CreateMailslot failed with %d\n", GetLastError());
+			return FALSE;
+		} 
+
+		Write("Created read mailslot!\n");
+
+		Write("Waiting to read lua file path from mailslot...\n");
+
+		ReadMailslot(hMailslotRead, true, ReceiveMailslotMessage);
 
 		m_hModule = GetModuleHandle(L"Lua51.dll");
 		if (!m_hModule)
@@ -236,7 +254,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	break;
 	case DLL_PROCESS_DETACH:
 	{
-		CloseHandle(m_hMailslot);
+		CloseHandle(m_hMailslotWrite);
 		DetourTransactionBegin();
 		DetourUpdateThread(GetCurrentThread());
 		DetourDetach(&luaopen_jit_original, luaopen_jit_hook);

@@ -417,9 +417,6 @@ function mydraw()
     love.graphics.printf(currentInputText, consoleLeftPadding, inputTextYPosition, love.graphics.getWidth())
 	love.graphics.setColor (.9,.9,.9)
     local textHeightPadded = textHeight + 2
-    ---local yOffset = -20 - cOutputHistory * textHeightPadded
-    ---for i,j in pairs(outputHistory) do
-        ---yOffset = yOffset + textHeightPadded + outputHistoryLineCount[i] * textHeightPadded
     local yOffset = inputTextYPosition
     for i=cOutputHistory-1, 0, -1 do
         yOffset = yOffset + -textHeightPadded * (1+outputHistoryLineCount[i])
