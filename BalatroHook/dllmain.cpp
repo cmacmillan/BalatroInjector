@@ -10,12 +10,12 @@ HANDLE m_hMailslotWrite;
 HMODULE m_hModule;
 char * m_pChzLuaPath = nullptr;
 
+// BB Really should just include lua.h so I don't have to manually write all this junk
+//  e.g. https://github.com/lua/lua/blob/master/lua.h but for 5.1
+
 #define LUA_REGISTRYINDEX       (-10000)
 #define LUA_ENVIRONINDEX        (-10001)
 #define LUA_GLOBALSINDEX        (-10002)
-
-// BB Really should just include lua.h so I don't have to manually write all this junk
-//  e.g. https://github.com/lua/lua/blob/master/lua.h but for 5.1
 
 #define LUA_OK		0
 #define LUA_YIELD	1
@@ -51,10 +51,10 @@ BOOL WriteFmt(const char * pChzFmt, ...)
 {
 	char pChzBuffer[1000];
 
-    va_list argList;
-    va_start(argList, pChzFmt);
-	vsprintf_s(pChzBuffer, DIM(pChzBuffer), pChzFmt, argList);
-    va_end(argList);
+    va_list arglist;
+    va_start(arglist, pChzFmt);
+	vsprintf_s(pChzBuffer, DIM(pChzBuffer), pChzFmt, arglist);
+    va_end(arglist);
 
 	return Write(pChzBuffer);
 }
@@ -67,87 +67,83 @@ typedef void * (*lua_Alloc) (void *ud,
                              size_t nsize);
 
 typedef int (*_luaL_loadfilex)(lua_State * L, const char * filename, const char * mode);
-_luaL_loadfilex luaL_loadfilex;
+_luaL_loadfilex m_lualloadfilexOriginal;
 
 typedef int (*_luaopen_jit)(lua_State * L);
-_luaopen_jit luaopen_jit_original;
+_luaopen_jit m_luaopenjitOriginal;
 
 typedef int (*_luaL_error)(lua_State * L, const char * fmt, ...);
-_luaL_error luaL_error_original;
+_luaL_error m_lualerrorOriginal;
 
 typedef int (*_luaL_loadstring)(lua_State * L, const char * str);
-_luaL_loadstring luaL_loadstring_original;
+_luaL_loadstring m_lualloadstringOriginal;
 
 typedef int (*_lua_pcall)(lua_State * L, int nargs, int nresults, int errfunc);
-_lua_pcall lua_pcall;
+_lua_pcall m_luapcallOriginal;
 
 typedef int (*_lua_CFunction) (lua_State *L);
-
 typedef void (*_lua_pushcclosure)(lua_State * L,_lua_CFunction f, int n);
-_lua_pushcclosure lua_pushcclosure;
+_lua_pushcclosure m_luapushcclosureOriginal;
 
 typedef void (*_lua_setfield)(lua_State * L, int index, const char * k);
-_lua_setfield lua_setfield;
+_lua_setfield m_luasetfieldOriginal;
 
 typedef const char * (*_lua_tolstring)(lua_State * L, int index, size_t * pLen);
-_lua_tolstring lua_tolstring;
+_lua_tolstring m_luatolstringOriginal;
 
 typedef lua_State * (*_lua_newstate)(lua_Alloc f, void *ud);
-_lua_newstate lua_newstate;
+_lua_newstate m_luanewstateOriginal;
 
 int m_cJithooks = 0;
 
-int luaL_loadstring(lua_State * L, const char * str)
+int LualloadstringReplacement(lua_State * pLuastate, const char * pChz)
 {
 	Write("LoadString!\n");
-	int ret_val = luaL_loadstring_original(L, str);
-	return ret_val;
+
+	return m_lualloadstringOriginal(pLuastate, pChz);
 }
 
-int luaL_error(lua_State * L, const char * fmt, ...) 
+int LualerrorReplacement(lua_State * pLuastate, const char * pChz, ...) 
 {
-	//WriteFmt(fmt, va_list());
 	Write("Error!\n");
 
-	int ret_val = luaL_error_original(L, fmt, va_list());
-	return ret_val;
+	return m_lualerrorOriginal(pLuastate, pChz, va_list());
 }
 
-int lua_my_print(lua_State * L) 
+int PrintToInjectorConsole(lua_State * pLuastate) 
 {
-	const char * pChz = lua_tolstring(L, 1, nullptr);
+	const char * pChz = m_luatolstringOriginal(pLuastate, 1, nullptr);
 	Write(pChz);
 	return 0;
 }
 
-int luaopen_jit_hook(lua_State * L)
+int LuaopenjithookReplacement(lua_State * pLuastate)
 {
-	int ret_val = luaopen_jit_original(L);
+	int nReturn = m_luaopenjitOriginal(pLuastate);
 
 	m_cJithooks++;
 	if (m_cJithooks > 1)
-		return ret_val;
+		return nReturn;
 
 	Write("Loading mod...\n");
 	WriteFmt("    Mod path: %s\n", m_pChzLuaPath);
 
-	lua_pushcclosure(L, lua_my_print, 0);
-	lua_setfield(L, LUA_GLOBALSINDEX, "my_print");
+	m_luapushcclosureOriginal(pLuastate, PrintToInjectorConsole, 0);
+	m_luasetfieldOriginal(pLuastate, LUA_GLOBALSINDEX, "InjectorPrint");
 
-	//int loadfileret = luaL_loadfilex(L, "C:\\Users\\chase\\Desktop\\Desktop_4\\BalatroHook\\BalatroHook\\mod.lua", NULL);
-	int loadfileret = luaL_loadfilex(L, m_pChzLuaPath, NULL);
+	int loadfileret = m_lualloadfilexOriginal(pLuastate, m_pChzLuaPath, NULL);
 
 	if (loadfileret != LUA_OK)
 	{
-		WriteFmt("Error loading lua file! %s\n", lua_tolstring(L, 0, nullptr));
+		WriteFmt("Error loading lua file! %s\n", m_luatolstringOriginal(pLuastate, 0, nullptr));
 	}
 	else 
 	{
 		Write("Loaded lua file!\n");
-		lua_pcall(L, 0, -1, 0);
+		m_luapcallOriginal(pLuastate, 0, -1, 0);
 	}
 
-	return ret_val;
+	return nReturn;
 }
 
 BOOL FTryFindFARPROCFromPchz(const char * pChz, FARPROC * pFarproc)
@@ -166,7 +162,7 @@ void ReceiveMailslotMessage(LPSTR lpstr)
 {
 	const int cCharBuffer = 1024;
 	m_pChzLuaPath = new char[cCharBuffer];
-	memcpy_s(m_pChzLuaPath, cCharBuffer, lpstr, strlen(lpstr));
+	memcpy_s(m_pChzLuaPath, cCharBuffer, lpstr, strlen(lpstr) + 1);
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule,
@@ -196,7 +192,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 
 		if (hMailslotRead == INVALID_HANDLE_VALUE) 
 		{ 
-			printf("CreateMailslot failed with %d\n", GetLastError());
+			Write("CreateMailslot failed! (Do you have multiple copies of balatro open?)\n");
 			return FALSE;
 		} 
 
@@ -213,40 +209,40 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 			return FALSE;
 		}
 
-		if (!FTryFindFARPROCFromPchz("luaopen_jit", (FARPROC *) &luaopen_jit_original))
+		if (!FTryFindFARPROCFromPchz("luaopen_jit", (FARPROC *) &m_luaopenjitOriginal))
 			return FALSE;
 
-		if (!FTryFindFARPROCFromPchz("luaL_loadfilex", (FARPROC *) &luaL_loadfilex))
+		if (!FTryFindFARPROCFromPchz("luaL_loadfilex", (FARPROC *) &m_lualloadfilexOriginal))
 			return FALSE;
 
-		if (!FTryFindFARPROCFromPchz("lua_pcall", (FARPROC *) &lua_pcall))
+		if (!FTryFindFARPROCFromPchz("lua_pcall", (FARPROC *) &m_luapcallOriginal))
 			return FALSE;
 
-		if (!FTryFindFARPROCFromPchz("luaL_error", (FARPROC *) &luaL_error_original))
+		if (!FTryFindFARPROCFromPchz("luaL_error", (FARPROC *) &m_lualerrorOriginal))
 			return FALSE;
 
-		if (!FTryFindFARPROCFromPchz("luaL_loadstring", (FARPROC *) &luaL_loadstring_original))
+		if (!FTryFindFARPROCFromPchz("luaL_loadstring", (FARPROC *) &m_lualloadstringOriginal))
 			return FALSE;
 
-		if (!FTryFindFARPROCFromPchz("lua_pushcclosure", (FARPROC *) &lua_pushcclosure))
+		if (!FTryFindFARPROCFromPchz("lua_pushcclosure", (FARPROC *) &m_luapushcclosureOriginal))
 			return FALSE;
 
-		if (!FTryFindFARPROCFromPchz("lua_setfield", (FARPROC *) &lua_setfield))
+		if (!FTryFindFARPROCFromPchz("lua_setfield", (FARPROC *) &m_luasetfieldOriginal))
 			return FALSE;
 
-		if (!FTryFindFARPROCFromPchz("lua_tolstring", (FARPROC *) &lua_tolstring))
+		if (!FTryFindFARPROCFromPchz("lua_tolstring", (FARPROC *) &m_luatolstringOriginal))
 			return FALSE;
 
-		if (!FTryFindFARPROCFromPchz("lua_newstate", (FARPROC *) &lua_newstate))
+		if (!FTryFindFARPROCFromPchz("lua_newstate", (FARPROC *) &m_luanewstateOriginal))
 			return FALSE;
 
 		DetourRestoreAfterWith();
 
 		DetourTransactionBegin();
 		DetourUpdateThread(GetCurrentThread());
-		DetourAttach(&luaopen_jit_original, luaopen_jit_hook);
-		DetourAttach(&luaL_error_original, luaL_error);
-		DetourAttach(&luaL_loadstring_original, luaL_loadstring);
+		DetourAttach(&m_luaopenjitOriginal, LuaopenjithookReplacement);
+		DetourAttach(&m_lualerrorOriginal, LualerrorReplacement);
+		DetourAttach(&m_lualloadstringOriginal, LualloadstringReplacement);
 		DetourTransactionCommit();
 
 		Write("Finished init!\n");
@@ -257,9 +253,9 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		CloseHandle(m_hMailslotWrite);
 		DetourTransactionBegin();
 		DetourUpdateThread(GetCurrentThread());
-		DetourDetach(&luaopen_jit_original, luaopen_jit_hook);
-		DetourDetach(&luaL_error_original, luaL_error);
-		DetourDetach(&luaL_loadstring_original, luaL_loadstring);
+		DetourDetach(&m_luaopenjitOriginal, LuaopenjithookReplacement);
+		DetourDetach(&m_lualerrorOriginal, LualerrorReplacement);
+		DetourDetach(&m_lualloadstringOriginal, LualloadstringReplacement);
 		DetourTransactionCommit();
 	}
 	break;

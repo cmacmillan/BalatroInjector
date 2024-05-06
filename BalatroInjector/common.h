@@ -18,7 +18,7 @@ void ReadMailslot(HANDLE hMailslot, bool fQuitAfterFirstRead, void (*funcCallbac
 		DWORD cbMessage, cMessage, cbRead; 
 		BOOL fResult; 
 		LPSTR lpszBuffer; 
-		TCHAR achID[80]; 
+		TCHAR aTchar[80]; 
 		DWORD cAllMessages; 
 		HANDLE hEvent;
 		OVERLAPPED ov;
@@ -56,7 +56,7 @@ void ReadMailslot(HANDLE hMailslot, bool fQuitAfterFirstRead, void (*funcCallbac
 			// Allocate memory for the message. 
 	 
 			lpszBuffer = (LPSTR) GlobalAlloc(GPTR, 
-				strlen((LPSTR) achID)*sizeof(CHAR) + cbMessage); 
+				strlen((LPSTR) aTchar)*sizeof(CHAR) + cbMessage); 
 			if (NULL == lpszBuffer) 
 			{
 				printf("Error allocating buffer! %d \n", GetLastError()); 

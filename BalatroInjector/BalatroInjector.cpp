@@ -69,14 +69,14 @@ int main(int argc, const char * argv[])
 
 	printf("Allocating dll memory...\n");
 
-	LPVOID p = VirtualAllocEx(
-				m_hProcess, 
-				nullptr, 
-				1 << 12, 
-				MEM_COMMIT | MEM_RESERVE, 
-				PAGE_READWRITE);
+	LPVOID pChzDllPathRemote = VirtualAllocEx(
+									m_hProcess, 
+									nullptr, 
+									1 << 12, 
+									MEM_COMMIT | MEM_RESERVE, 
+									PAGE_READWRITE);
 
-	if (!p) {
+	if (!pChzDllPathRemote) {
 		printf("Error allocating memory!\n");
 		return 1;
 	}
@@ -85,7 +85,7 @@ int main(int argc, const char * argv[])
 
 	WriteProcessMemory(
 		m_hProcess, 
-		p, 
+		pChzDllPathRemote, 
 		pChzDllPath, 
 		strlen(pChzDllPath) + 1, 
 		nullptr);
@@ -97,7 +97,7 @@ int main(int argc, const char * argv[])
 						nullptr, 
 						0, 
 						(LPTHREAD_START_ROUTINE) GetProcAddress(GetModuleHandle(L"kernel32.dll"), "LoadLibraryA"),
-						p,
+						pChzDllPathRemote,
 						0,
 						nullptr);
 
@@ -112,6 +112,7 @@ int main(int argc, const char * argv[])
 	while (true) 
 	{
 		Sleep(100);
+
 		HANDLE hMailslotWrite = CreateFile(lpctstrSlotToDll,
 									GENERIC_WRITE,
 									FILE_SHARE_READ,
